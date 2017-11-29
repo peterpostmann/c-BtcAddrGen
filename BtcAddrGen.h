@@ -19,21 +19,6 @@ typedef struct Secp256k1UncompressedPublicKey {
 
 int Secp256k1(const Secp256k1Key *privateKey, Secp256k1UncompressedPublicKey *publicKey);
 
-// --- BTC
-
-#define BTC_UNCOMPRESSED_PUBLIC_KEY_SIZE ((2* SECP256K1_KEY_SIZE) + 1)
-#define BTC_PUBLIC_KEY_SIZE              (    SECP256K1_KEY_SIZE  + 1)
-
-typedef struct BtcUncompressedPublicKey {
-    unsigned char version;
-    Secp256k1UncompressedPublicKey key;
-} BtcUncompressedPublicKey;
-
-typedef struct BtcPublicKey {
-    unsigned char version;
-    Secp256k1Key key;
-} BtcPublicKey;
-
 // --- SHA256
 
 #define SHA256_HASH_SIZE 32
@@ -54,5 +39,31 @@ typedef struct Ripemd160Hash {
 
 void Ripemd160(const uint8_t *data, uint32_t len, Ripemd160Hash *hash);
 
-#endif // !Secp256k1_H
+
+// --- BTC
+
+#define BTC_UNCOMPRESSED_PUBLIC_KEY_SIZE ((2* SECP256K1_KEY_SIZE) + 1)
+#define BTC_PUBLIC_KEY_SIZE              (    SECP256K1_KEY_SIZE  + 1)
+#define BTC_ADDRESS_RAW_SIZE             /   RIPEMD160_HASH_SIZE  + 1)
+
+typedef struct BtcUncompressedPublicKey {
+    unsigned char version;
+    Secp256k1UncompressedPublicKey key;
+} BtcUncompressedPublicKey;
+
+typedef Secp256k1Key BtcPrivateKey;
+
+typedef struct BtcPublicKey {
+    unsigned char version;
+    Secp256k1Key key;
+} BtcPublicKey;
+
+typedef struct BtcAddressRaw {
+    unsigned char network;
+    Ripemd160Hash hash;
+} BtcAddressRaw;
+
+void BtcRaw(const BtcPrivateKey *privateKey, BtcAddressRaw *addressRaw);
+
+#endif // !BTCADDRGEN_H
 

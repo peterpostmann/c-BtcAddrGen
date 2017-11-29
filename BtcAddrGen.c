@@ -42,3 +42,17 @@ void Ripemd160(const uint8_t *data, uint32_t len, Ripemd160Hash *hash)
     RMD160Update(&ctx, data, len);
     RMD160Final(hash, &ctx);
 }
+
+// --- BTC
+
+void BtcRaw(const BtcPrivateKey *privateKey, BtcAddressRaw *addressRaw)
+{
+    BtcUncompressedPublicKey pubKey = { .version = 0x04 };
+    Secp256k1(privateKey, &(pubKey.key));
+
+    Sha256Hash hash;
+    Sha256(&pubKey, BTC_UNCOMPRESSED_PUBLIC_KEY_SIZE, &hash);
+
+    Ripemd160(&hash, SHA256_HASH_SIZE, addressRaw);
+    addressRaw->network = 0x00;
+}
