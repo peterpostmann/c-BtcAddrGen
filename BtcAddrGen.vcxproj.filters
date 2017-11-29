@@ -1,0 +1,42 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="lib\micro-ecc\uECC.c">
+      <Filter>lib\micro-ecc</Filter>
+    </ClCompile>
+    <ClCompile Include="main.c" />
+    <ClCompile Include="lib\sha256\sha256.c">
+      <Filter>lib\sha256</Filter>
+    </ClCompile>
+    <ClCompile Include="BtcAddrGen.c" />
+    <ClCompile Include="lib\ripemd160\rmd160.c">
+      <Filter>lib\ripemd160</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="lib">
+      <UniqueIdentifier>{9dc30a41-7b7f-4ac7-834c-84e7c73e53f2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="lib\micro-ecc">
+      <UniqueIdentifier>{d0c0f0ab-83ed-4f6f-8d75-acd0b4ae78b8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="lib\sha256">
+      <UniqueIdentifier>{eb3bbd88-343b-4fb8-916a-a0828ac845b6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="lib\ripemd160">
+      <UniqueIdentifier>{a2291118-4671-4cdd-abb4-de77c7453b67}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="lib\micro-ecc\uECC.h">
+      <Filter>lib\micro-ecc</Filter>
+    </ClInclude>
+    <ClInclude Include="lib\sha256\sha256.h">
+      <Filter>lib\sha256</Filter>
+    </ClInclude>
+    <ClInclude Include="BtcAddrGen.h" />
+    <ClInclude Include="lib\ripemd160\rmd160.h">
+      <Filter>lib\ripemd160</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
