@@ -4,6 +4,9 @@
 
 #include <inttypes.h>
 
+
+void vli_print(char *str, uint8_t *vli, unsigned int size);
+
 // --- ECDSA
 
 #define SECP256K1_KEY_SIZE 32
@@ -44,7 +47,7 @@ void Ripemd160(const uint8_t *data, uint32_t len, Ripemd160Hash *hash);
 
 #define BTC_UNCOMPRESSED_PUBLIC_KEY_SIZE ((2* SECP256K1_KEY_SIZE) + 1)
 #define BTC_PUBLIC_KEY_SIZE              (    SECP256K1_KEY_SIZE  + 1)
-#define BTC_ADDRESS_RAW_SIZE             /   RIPEMD160_HASH_SIZE  + 1)
+#define BTC_ADDRESS_RAW_SIZE             (   RIPEMD160_HASH_SIZE  + 1)
 
 typedef struct BtcUncompressedPublicKey {
     unsigned char version;
@@ -63,7 +66,7 @@ typedef struct BtcAddressRaw {
     Ripemd160Hash hash;
 } BtcAddressRaw;
 
-void BtcRaw(const BtcPrivateKey *privateKey, BtcAddressRaw *addressRaw);
+void BtcRaw(const BtcPrivateKey *privateKey, BtcAddressRaw *addressRaw, int compress);
 
 #endif // !BTCADDRGEN_H
 
