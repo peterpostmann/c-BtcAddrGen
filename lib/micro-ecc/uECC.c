@@ -49,15 +49,6 @@ static const uECC_word_t curve_p[uECC_WORDS] = Curve_P;
 static const uECC_word_t curve_b[uECC_WORDS] = Curve_B;
 static const EccPoint curve_G = Curve_G;
 static const uECC_word_t curve_n[uECC_N_WORDS] = Curve_N;
-
-
-
-
-
-
-
-
-
 static void vli_clear(uECC_word_t *vli);
 static uECC_word_t vli_isZero(const uECC_word_t *vli);
 static uECC_word_t vli_testBit(const uECC_word_t *vli, bitcount_t bit);
@@ -410,7 +401,6 @@ static void vli_modSquare_fast(uECC_word_t *result, const uECC_word_t *left) {
 /* Computes result = (1 / input) % mod. All VLIs are the same size.
    See "From Euclid's GCD to Montgomery Multiplication to the Great Divide"
    https://labs.oracle.com/techrep/2001/smli_tr-2001-95.pdf */
-#if !asm_modInv
 static void vli_modInv(uECC_word_t *result, const uECC_word_t *input, const uECC_word_t *mod) {
     uECC_word_t a[uECC_WORDS], b[uECC_WORDS], u[uECC_WORDS], v[uECC_WORDS];
     uECC_word_t carry;
@@ -478,14 +468,8 @@ static void vli_modInv(uECC_word_t *result, const uECC_word_t *input, const uECC
     }
     vli_set(result, u);
 }
-#endif /* !asm_modInv */
 
 /* ------ Point operations ------ */
-
-/* Returns 1 if 'point' is the point at infinity, 0 otherwise. */
-static cmpresult_t EccPoint_isZero(const EccPoint *point) {
-    return (vli_isZero(point->x) && vli_isZero(point->y));
-}
 
 /* Point multiplication algorithm using Montgomery's ladder with co-Z coordinates.
 From http://eprint.iacr.org/2011/338.pdf
@@ -657,45 +641,18 @@ static void EccPoint_mult(EccPoint * RESTRICT result,
     nb = !vli_testBit(scalar, 0);
     XYcZ_addC(Rx[1 - nb], Ry[1 - nb], Rx[nb], Ry[nb]);
 
-    /* Find final 1/Z value. */
-    vli_modSub_fast(z, Rx[1], Rx[0]);   /* X1 - X0 */
-    vli_modMult_fast(z, z, Ry[1 - nb]); /* Yb * (X1 - X0) */
-    vli_modMult_fast(z, z, point->x); /* xP * Yb * (X1 - X0) */
-    vli_modInv(z, z, curve_p);          /* 1 / (xP * Yb * (X1 - X0)) */
-    vli_modMult_fast(z, z, point->y); /* yP / (xP * Yb * (X1 - X0)) */
-    vli_modMult_fast(z, z, Rx[1 - nb]); /* Xb * yP / (xP * Yb * (X1 - X0)) */
-    /* End 1/Z calculation */
+    vli_modSub_fast(z, Rx[1], Rx[0]);       // X1 - X0
+    vli_modMult_fast(z, z, Ry[1 - nb]);     // Yb * (X1 - X0)
+    vli_modMult_fast(z, z, point->x);       // xP * Yb * (X1 - X0)
+    vli_modInv(z, z, curve_p);              // 1 / (xP * Yb * (X1 - X0))
+    vli_modMult_fast(z, z, point->y);       // yP / (xP * Yb * (X1 - X0))
+    vli_modMult_fast(z, z, Rx[1 - nb]);     // Xb * yP / (xP * Yb * (X1 - X0))
 
     XYcZ_add(Rx[nb], Ry[nb], Rx[1 - nb], Ry[1 - nb]);
     apply_z(Rx[0], Ry[0], z);
 
     vli_set(result->x, Rx[0]);
     vli_set(result->y, Ry[0]);
-}
-
-static int EccPoint_compute_public_key(EccPoint *result, uECC_word_t *private) {
-
-    EccPoint_mult(result, &curve_G, private, 0, vli_numBits(private, uECC_WORDS));
-
-    return 1;
-}
-
-/* Compute a = sqrt(a) (mod curve_p). */
-static void mod_sqrt(uECC_word_t *a) {
-    bitcount_t i;
-    uECC_word_t p1[uECC_WORDS] = {1};
-    uECC_word_t l_result[uECC_WORDS] = {1};
-
-    /* Since curve_p == 3 (mod 4) for all supported curves, we can
-       compute sqrt(a) = a^((curve_p + 1) / 4) (mod curve_p). */
-    vli_add(p1, curve_p, p1); /* p1 = curve_p + 1 */
-    for (i = vli_numBits(p1, uECC_WORDS) - 1; i > 1; --i) {
-        vli_modSquare_fast(l_result, l_result);
-        if (vli_testBit(p1, i)) {
-            vli_modMult_fast(l_result, l_result, a);
-        }
-    }
-    vli_set(a, l_result);
 }
 
 static void vli_nativeToBytes(uint8_t *bytes, const uint64_t *native) {
@@ -713,25 +670,6 @@ static void vli_nativeToBytes(uint8_t *bytes, const uint64_t *native) {
     }
 }
 
-static void vli_bytesToNative(uint64_t *native, const uint8_t *bytes) {
-    unsigned i;
-    for (i = 0; i < uECC_WORDS; ++i) {
-        const uint8_t *digit = bytes + 8 * (uECC_WORDS - 1 - i);
-        native[i] = ((uint64_t)digit[0] << 56) | ((uint64_t)digit[1] << 48) |
-                    ((uint64_t)digit[2] << 40) | ((uint64_t)digit[3] << 32) |
-                    ((uint64_t)digit[4] << 24) | ((uint64_t)digit[5] << 16) |
-                    ((uint64_t)digit[6] << 8) | (uint64_t)digit[7];
-    }
-}
-
-/* Computes result = x^3 + ax + b. result must not overlap x. */
-static void curve_x_side(uECC_word_t * RESTRICT result, const uECC_word_t * RESTRICT x) {
-    vli_modSquare_fast(result, x); /* r = x^2 */
-    vli_modMult_fast(result, result, x); /* r = x^3 */
-    vli_modAdd(result, result, curve_b, curve_p); /* r = x^3 + b */
-}
-
-
 void vli_print_native(char *str, uint8_t *vli, unsigned int size);
 
 int uECC_compute_public_key(const uint8_t private_key[uECC_BYTES],
@@ -739,70 +677,50 @@ int uECC_compute_public_key(const uint8_t private_key[uECC_BYTES],
     uECC_word_t private[uECC_WORDS];
     EccPoint public;
 
+    EccPoint * RESTRICT result = &public;
+    EccPoint * RESTRICT point = &curve_G;
+    uECC_word_t * RESTRICT scalar = private_key;
+    uECC_word_t * RESTRICT initialZ = 0;
+    bitcount_t numBits = vli_numBits(private_key, uECC_WORDS);
+    
+    uECC_word_t Rx[2][uECC_WORDS];
+    uECC_word_t Ry[2][uECC_WORDS];
+    uECC_word_t z[uECC_WORDS];
+    bitcount_t i;
+    uECC_word_t nb;
 
-    //vli_bytesToNative(private, private_key);
-    //vli_print("1: ", private_key, uECC_BYTES);
-    //vli_print("2: ", private, uECC_BYTES);
+    vli_set(Rx[1], point->x);
+    vli_set(Ry[1], point->y);
 
-    if (!EccPoint_compute_public_key(&public, private_key)) {
-        return 0;
+    XYcZ_initial_double(Rx[1], Ry[1], Rx[0], Ry[0], initialZ);
+
+    for (i = numBits - 2; i > 0; --i) {
+        nb = !vli_testBit(scalar, i);
+        XYcZ_addC(Rx[1 - nb], Ry[1 - nb], Rx[nb], Ry[nb]);
+        XYcZ_add(Rx[nb], Ry[nb], Rx[1 - nb], Ry[1 - nb]);
     }
+
+    nb = !vli_testBit(scalar, 0);
+    XYcZ_addC(Rx[1 - nb], Ry[1 - nb], Rx[nb], Ry[nb]);
+
+    /* Find final 1/Z value. */
+    vli_modSub_fast(z, Rx[1], Rx[0]);   /* X1 - X0 */
+    vli_modMult_fast(z, z, Ry[1 - nb]); /* Yb * (X1 - X0) */
+    vli_modMult_fast(z, z, point->x); /* xP * Yb * (X1 - X0) */
+    vli_modInv(z, z, curve_p);          /* 1 / (xP * Yb * (X1 - X0)) */
+    vli_modMult_fast(z, z, point->y); /* yP / (xP * Yb * (X1 - X0)) */
+    vli_modMult_fast(z, z, Rx[1 - nb]); /* Xb * yP / (xP * Yb * (X1 - X0)) */
+                                        /* End 1/Z calculation */
+
+    XYcZ_add(Rx[nb], Ry[nb], Rx[1 - nb], Ry[1 - nb]);
+    apply_z(Rx[0], Ry[0], z);
+
+    vli_set(result->x, Rx[0]);
+    vli_set(result->y, Ry[0]);
 
     vli_print_native("2: ", &public, 2*uECC_BYTES);
 
     vli_nativeToBytes(public_key, public.x);
     vli_nativeToBytes(public_key + uECC_BYTES, public.y);
     return 1;
-}
-
-/* -------- ECDSA code -------- */
-
-#define vli_cmp_n vli_cmp
-#define vli_modInv_n vli_modInv
-#define vli_modAdd_n vli_modAdd
-
-static void vli2_rshift1(uECC_word_t *vli) {
-    vli_rshift1(vli);
-    vli[uECC_WORDS - 1] |= vli[uECC_WORDS] << (uECC_WORD_BITS - 1);
-    vli_rshift1(vli + uECC_WORDS);
-}
-
-static uECC_word_t vli2_sub(uECC_word_t *result,
-                            const uECC_word_t *left,
-                            const uECC_word_t *right) {
-    uECC_word_t borrow = 0;
-    wordcount_t i;
-    for (i = 0; i < uECC_WORDS * 2; ++i) {
-        uECC_word_t diff = left[i] - right[i] - borrow;
-        if (diff != left[i]) {
-            borrow = (diff > left[i]);
-        }
-        result[i] = diff;
-    }
-    return borrow;
-}
-
-/* Computes result = (left * right) % curve_n. */
-static void vli_modMult_n(uECC_word_t *result, const uECC_word_t *left, const uECC_word_t *right) {
-    uECC_word_t product[2 * uECC_WORDS];
-    uECC_word_t modMultiple[2 * uECC_WORDS];
-    uECC_word_t tmp[2 * uECC_WORDS];
-    uECC_word_t *v[2] = {tmp, product};
-    bitcount_t i;
-    uECC_word_t index = 1;
-
-    vli_mult(product, left, right);
-    vli_set(modMultiple + uECC_WORDS, curve_n); /* works if curve_n has its highest bit set */
-    vli_clear(modMultiple);
-
-    for (i = 0; i <= uECC_BYTES * 8; ++i) {
-        uECC_word_t borrow = vli2_sub(v[1 - index], v[index], modMultiple);
-        index = !(index ^ borrow); /* Swap the index if there was no borrow */
-        vli2_rshift1(modMultiple);
-    }
-    vli_set(result, v[index]);
-}
-
-static bitcount_t smax(bitcount_t a, bitcount_t b) {
-    return (a > b ? a : b);
 }
