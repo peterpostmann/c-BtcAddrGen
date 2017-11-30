@@ -26,6 +26,9 @@
     <Filter Include="lib\ripemd160">
       <UniqueIdentifier>{a2291118-4671-4cdd-abb4-de77c7453b67}</UniqueIdentifier>
     </Filter>
+    <Filter Include="lib\vli">
+      <UniqueIdentifier>{223cff23-bc94-4043-b583-b130a69705e2}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="lib\micro-ecc\uECC.h">

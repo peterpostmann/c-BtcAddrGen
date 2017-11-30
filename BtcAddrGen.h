@@ -66,7 +66,7 @@ typedef struct BtcAddressRaw {
     Ripemd160Hash hash;
 } BtcAddressRaw;
 
-void BtcRaw(const BtcPrivateKey *privateKey, BtcAddressRaw *addressRaw, int compress);
+void BtcRaw(const BtcPrivateKey *privateKey, BtcAddressRaw *addressRaw);
 
 #endif // !BTCADDRGEN_H
 
