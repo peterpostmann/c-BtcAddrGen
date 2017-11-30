@@ -1,187 +1,256 @@
-/*
-*   SHA-256 implementation.
-*
-*   Copyright (c) 2010 Ilya O. Levin, http://www.literatecode.com
-*
-*   Permission to use, copy, modify, and distribute this software for any
-*   purpose with or without fee is hereby granted, provided that the above
-*   copyright notice and this permission notice appear in all copies.
-*
-*   THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-*   WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-*   MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
-*   ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-*   WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
-*   ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
-*   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-*/
-#define SWAP_BYTES
-// #define USE_STD_MEMCPY
-// #define SELF_TEST
+/* sha256.c - TinyCrypt SHA-256 crypto hash algorithm implementation */
 
-#ifdef USE_STD_MEMCPY
-#include <string.h>
-#endif
+/*
+ *  Copyright (C) 2017 by Intel Corporation, All Rights Reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without
+ *  modification, are permitted provided that the following conditions are met:
+ *
+ *    - Redistributions of source code must retain the above copyright notice,
+ *     this list of conditions and the following disclaimer.
+ *
+ *    - Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ *    - Neither the name of Intel Corporation nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ *  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ *  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ *  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+ *  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ *  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ *  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ *  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ *  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ *  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ *  POSSIBILITY OF SUCH DAMAGE.
+ */
+
 #include "sha256.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <string.h>
 
-#define RL(x,n)   (((x) << n) | ((x) >> (32 - n)))
-#define RR(x,n)   (((x) >> n) | ((x) << (32 - n)))
+#define MASK_TWENTY_SEVEN 0x1b
 
-#define S0(x)  (RR((x), 2) ^ RR((x),13) ^ RR((x),22))
-#define S1(x)  (RR((x), 6) ^ RR((x),11) ^ RR((x),25))
-#define G0(x)  (RR((x), 7) ^ RR((x),18) ^ ((x) >> 3))
-#define G1(x)  (RR((x),17) ^ RR((x),19) ^ ((x) >> 10))
+unsigned int _copy(uint8_t *to, unsigned int to_len,
+    const uint8_t *from, unsigned int from_len)
+{
+    if (from_len <= to_len) {
+        (void)memcpy(to, from, from_len);
+        return from_len;
+    }
+    else {
+        return TC_CRYPTO_FAIL;
+    }
+}
 
-#ifdef SWAP_BYTES
-#define BSWP(x,y)  _bswapw((uint32_t *)(x), (uint32_t)(y))
-#else
-#define BSWP(p,n)
-#endif
-#ifdef USE_STD_MEMCPY
-#define MEMCP(x,y,z) memcpy((x),(y),(z))
-#else
-#define MEMCP(x,y,z) _memcp((x),(y),(z))
-#endif
+void _set(void *to, uint8_t val, unsigned int len)
+{
+    (void)memset(to, val, len);
+}
 
-#ifndef __cdecl
-#define __cdecl
-#endif
+/*
+* Doubles the value of a byte for values up to 127.
+*/
+uint8_t _double_byte(uint8_t a)
+{
+    return ((a << 1) ^ ((a >> 7) * MASK_TWENTY_SEVEN));
+}
 
-static const uint32_t K[64] = {
-     0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
-     0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
-     0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
-     0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
-     0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc,
-     0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
-     0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7,
-     0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
-     0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13,
-     0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
-     0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3,
-     0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
-     0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5,
-     0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
-     0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
-     0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+int _compare(const uint8_t *a, const uint8_t *b, size_t size)
+{
+    const uint8_t *tempa = a;
+    const uint8_t *tempb = b;
+    uint8_t result = 0;
+
+    for (unsigned int i = 0; i < size; i++) {
+        result |= tempa[i] ^ tempb[i];
+    }
+    return result;
+}
+
+static void compress(unsigned int *iv, const uint8_t *data);
+
+int tc_sha256_init(TCSha256State_t s)
+{
+	/* input sanity check: */
+	if (s == (TCSha256State_t) 0) {
+		return TC_CRYPTO_FAIL;
+	}
+
+	/*
+	 * Setting the initial state values.
+	 * These values correspond to the first 32 bits of the fractional parts
+	 * of the square roots of the first 8 primes: 2, 3, 5, 7, 11, 13, 17
+	 * and 19.
+	 */
+	_set((uint8_t *) s, 0x00, sizeof(*s));
+	s->iv[0] = 0x6a09e667;
+	s->iv[1] = 0xbb67ae85;
+	s->iv[2] = 0x3c6ef372;
+	s->iv[3] = 0xa54ff53a;
+	s->iv[4] = 0x510e527f;
+	s->iv[5] = 0x9b05688c;
+	s->iv[6] = 0x1f83d9ab;
+	s->iv[7] = 0x5be0cd19;
+
+	return TC_CRYPTO_SUCCESS;
+}
+
+int tc_sha256_update(TCSha256State_t s, const uint8_t *data, size_t datalen)
+{
+	/* input sanity check: */
+	if (s == (TCSha256State_t) 0 ||
+	    data == (void *) 0) {
+		return TC_CRYPTO_FAIL;
+	} else if (datalen == 0) {
+		return TC_CRYPTO_SUCCESS;
+	}
+
+	while (datalen-- > 0) {
+		s->leftover[s->leftover_offset++] = *(data++);
+		if (s->leftover_offset >= TC_SHA256_BLOCK_SIZE) {
+			compress(s->iv, s->leftover);
+			s->leftover_offset = 0;
+			s->bits_hashed += (TC_SHA256_BLOCK_SIZE << 3);
+		}
+	}
+
+	return TC_CRYPTO_SUCCESS;
+}
+
+int tc_sha256_final(uint8_t *digest, TCSha256State_t s)
+{
+	unsigned int i;
+
+	/* input sanity check: */
+	if (digest == (uint8_t *) 0 ||
+	    s == (TCSha256State_t) 0) {
+		return TC_CRYPTO_FAIL;
+	}
+
+	s->bits_hashed += (s->leftover_offset << 3);
+
+	s->leftover[s->leftover_offset++] = 0x80; /* always room for one byte */
+	if (s->leftover_offset > (sizeof(s->leftover) - 8)) {
+		/* there is not room for all the padding in this block */
+		_set(s->leftover + s->leftover_offset, 0x00,
+		     sizeof(s->leftover) - s->leftover_offset);
+		compress(s->iv, s->leftover);
+		s->leftover_offset = 0;
+	}
+
+	/* add the padding and the length in big-Endian format */
+	_set(s->leftover + s->leftover_offset, 0x00,
+	     sizeof(s->leftover) - 8 - s->leftover_offset);
+	s->leftover[sizeof(s->leftover) - 1] = (uint8_t)(s->bits_hashed);
+	s->leftover[sizeof(s->leftover) - 2] = (uint8_t)(s->bits_hashed >> 8);
+	s->leftover[sizeof(s->leftover) - 3] = (uint8_t)(s->bits_hashed >> 16);
+	s->leftover[sizeof(s->leftover) - 4] = (uint8_t)(s->bits_hashed >> 24);
+	s->leftover[sizeof(s->leftover) - 5] = (uint8_t)(s->bits_hashed >> 32);
+	s->leftover[sizeof(s->leftover) - 6] = (uint8_t)(s->bits_hashed >> 40);
+	s->leftover[sizeof(s->leftover) - 7] = (uint8_t)(s->bits_hashed >> 48);
+	s->leftover[sizeof(s->leftover) - 8] = (uint8_t)(s->bits_hashed >> 56);
+
+	/* hash the padding and length */
+	compress(s->iv, s->leftover);
+
+	/* copy the iv out to digest */
+	for (i = 0; i < TC_SHA256_STATE_BLOCKS; ++i) {
+		unsigned int t = *((unsigned int *) &s->iv[i]);
+		*digest++ = (uint8_t)(t >> 24);
+		*digest++ = (uint8_t)(t >> 16);
+		*digest++ = (uint8_t)(t >> 8);
+		*digest++ = (uint8_t)(t);
+	}
+
+	/* destroy the current state */
+	_set(s, 0, sizeof(*s));
+
+	return TC_CRYPTO_SUCCESS;
+}
+
+/*
+ * Initializing SHA-256 Hash constant words K.
+ * These values correspond to the first 32 bits of the fractional parts of the
+ * cube roots of the first 64 primes between 2 and 311.
+ */
+static const unsigned int k256[64] = {
+	0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1,
+	0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
+	0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786,
+	0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+	0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147,
+	0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13,
+	0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b,
+	0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+	0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a,
+	0x5b9cca4f, 0x682e6ff3, 0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
+	0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
 };
 
-/* -------------------------------------------------------------------------- */
-static void _bswapw(uint32_t *p, uint32_t i)
+static inline unsigned int ROTR(unsigned int a, unsigned int n)
 {
-    while (i--) p[i] = (RR(p[i],24) & 0x00ff00ff) | (RR(p[i],8) & 0xff00ff00);
-
-} /* _bswapw */
-
-/* -------------------------------------------------------------------------- */
-#ifndef USE_STD_MEMCPY
-void * __cdecl _memcp (void *d, const void *s, uint32_t sz)
-{
-    void *rv = d;
-
-    while (sz--) *(char *)d = *(char *)s, d = (char *)d + 1,  s = (char *)s + 1;
-
-    return(rv);
-} /* _memcp */
-#endif
-
-/* -------------------------------------------------------------------------- */
-static void _rtrf(uint32_t *b, uint32_t *p, uint32_t i, uint32_t j)
-{
-    #define B(x, y) b[(x-y) & 7]
-    #define P(x, y) p[(x+y) & 15]
-
-    B(7,i) += (j ? (p[i & 15] += G1(P(i,14)) + P(i,9) + G0(P(i,1))) : p[i & 15])
-              + K[i+j] + S1(B(4,i))
-              + (B(6,i) ^ (B(4,i) & (B(5,i) ^ B(6,i))));
-    B(3,i) += B(7,i);
-    B(7,i) += S0(B(0,i)) + ( (B(0,i) & B(1,i)) | (B(2,i) & (B(0,i) ^ B(1,i))) );
-
-    #undef P
-    #undef B
-} /* _rtrf */
-
-/* -------------------------------------------------------------------------- */
-static void _hash(sha256_context *ctx)
-{
-    uint32_t b[8], *p, j;
-
-    b[0] = ctx->hash[0]; b[1] = ctx->hash[1]; b[2] = ctx->hash[2];
-    b[3] = ctx->hash[3]; b[4] = ctx->hash[4]; b[5] = ctx->hash[5];
-    b[6] = ctx->hash[6]; b[7] = ctx->hash[7];
-
-    for (p = ctx->buf, j = 0; j < 64; j += 16)
-        _rtrf(b, p,  0, j), _rtrf(b, p,  1, j), _rtrf(b, p,  2, j),
-        _rtrf(b, p,  3, j), _rtrf(b, p,  4, j), _rtrf(b, p,  5, j),
-        _rtrf(b, p,  6, j), _rtrf(b, p,  7, j), _rtrf(b, p,  8, j),
-        _rtrf(b, p,  9, j), _rtrf(b, p, 10, j), _rtrf(b, p, 11, j),
-        _rtrf(b, p, 12, j), _rtrf(b, p, 13, j), _rtrf(b, p, 14, j),
-        _rtrf(b, p, 15, j);
-
-    ctx->hash[0] += b[0]; ctx->hash[1] += b[1]; ctx->hash[2] += b[2];
-    ctx->hash[3] += b[3]; ctx->hash[4] += b[4]; ctx->hash[5] += b[5];
-    ctx->hash[6] += b[6]; ctx->hash[7] += b[7];
-
-} /* _hash */
-
-/* -------------------------------------------------------------------------- */
-void sha256_init(sha256_context *ctx)
-{
-    ctx->len[0] = ctx->len[1] = 0;
-    ctx->hash[0] = 0x6a09e667; ctx->hash[1] = 0xbb67ae85;
-    ctx->hash[2] = 0x3c6ef372; ctx->hash[3] = 0xa54ff53a;
-    ctx->hash[4] = 0x510e527f; ctx->hash[5] = 0x9b05688c;
-    ctx->hash[6] = 0x1f83d9ab; ctx->hash[7] = 0x5be0cd19;
-
-} /* sha256_init */
-
-/* -------------------------------------------------------------------------- */
-void sha256_hash(sha256_context *ctx, const uint8_t *dat, uint32_t sz)
-{
-    register uint32_t i = ctx->len[0] & 63, l, j;
-
-    if ((ctx->len[0] += sz) < sz)  ++(ctx->len[1]);
-
-    for (j = 0, l = 64-i; sz >= l; j += l, sz -= l, l = 64, i = 0)
-    {
-        MEMCP((char *)ctx->buf + i, &dat[j], l);
-        BSWP(ctx->buf, 16 );
-        _hash(ctx);
-    }
-    MEMCP((char *)ctx->buf + i, &dat[j], sz);
-
-} /* _hash */
-
-/* -------------------------------------------------------------------------- */
-void sha256_done(sha256_context *ctx, uint8_t *buf)
-{
-    uint32_t i = (uint32_t)(ctx->len[0] & 63), j = ((~i) & 3) << 3;
-
-    BSWP(ctx->buf, (i + 3) >> 2);
-
-    ctx->buf[i >> 2] &= 0xffffff80 << j;  /* add padding */
-    ctx->buf[i >> 2] |= 0x00000080 << j;
-
-    if (i < 56) i = (i >> 2) + 1;
-       else ctx->buf[15] ^= (i < 60) ? ctx->buf[15] : 0, _hash(ctx), i = 0;
-
-    while (i < 14) ctx->buf[i++] = 0;
-
-    ctx->buf[14] = (ctx->len[1] << 3)|(ctx->len[0] >> 29); /* add length */
-    ctx->buf[15] = ctx->len[0] << 3;
-
-    _hash(ctx);
-
-    for (i = 0; i < 32; i++)
-       ctx->buf[i % 16] = 0, /* may remove this line in case of a DIY cleanup */
-       buf[i] = (uint8_t)(ctx->hash[i >> 2] >> ((~i & 3) << 3));
-
-} /* sha256_done */
-
-#ifdef __cplusplus
+	return (((a) >> n) | ((a) << (32 - n)));
 }
-#endif
+
+#define Sigma0(a)(ROTR((a), 2) ^ ROTR((a), 13) ^ ROTR((a), 22))
+#define Sigma1(a)(ROTR((a), 6) ^ ROTR((a), 11) ^ ROTR((a), 25))
+#define sigma0(a)(ROTR((a), 7) ^ ROTR((a), 18) ^ ((a) >> 3))
+#define sigma1(a)(ROTR((a), 17) ^ ROTR((a), 19) ^ ((a) >> 10))
+
+#define Ch(a, b, c)(((a) & (b)) ^ ((~(a)) & (c)))
+#define Maj(a, b, c)(((a) & (b)) ^ ((a) & (c)) ^ ((b) & (c)))
+
+static inline unsigned int BigEndian(const uint8_t **c)
+{
+	unsigned int n = 0;
+
+	n = (((unsigned int)(*((*c)++))) << 24);
+	n |= ((unsigned int)(*((*c)++)) << 16);
+	n |= ((unsigned int)(*((*c)++)) << 8);
+	n |= ((unsigned int)(*((*c)++)));
+	return n;
+}
+
+static void compress(unsigned int *iv, const uint8_t *data)
+{
+	unsigned int a, b, c, d, e, f, g, h;
+	unsigned int s0, s1;
+	unsigned int t1, t2;
+	unsigned int work_space[16];
+	unsigned int n;
+	unsigned int i;
+
+	a = iv[0]; b = iv[1]; c = iv[2]; d = iv[3];
+	e = iv[4]; f = iv[5]; g = iv[6]; h = iv[7];
+
+	for (i = 0; i < 16; ++i) {
+		n = BigEndian(&data);
+		t1 = work_space[i] = n;
+		t1 += h + Sigma1(e) + Ch(e, f, g) + k256[i];
+		t2 = Sigma0(a) + Maj(a, b, c);
+		h = g; g = f; f = e; e = d + t1;
+		d = c; c = b; b = a; a = t1 + t2;
+	}
+
+	for ( ; i < 64; ++i) {
+		s0 = work_space[(i+1)&0x0f];
+		s0 = sigma0(s0);
+		s1 = work_space[(i+14)&0x0f];
+		s1 = sigma1(s1);
+
+		t1 = work_space[i&0xf] += s0 + s1 + work_space[(i+9)&0xf];
+		t1 += h + Sigma1(e) + Ch(e, f, g) + k256[i];
+		t2 = Sigma0(a) + Maj(a, b, c);
+		h = g; g = f; f = e; e = d + t1;
+		d = c; c = b; b = a; a = t1 + t2;
+	}
+
+	iv[0] += a; iv[1] += b; iv[2] += c; iv[3] += d;
+	iv[4] += e; iv[5] += f; iv[6] += g; iv[7] += h;
+}

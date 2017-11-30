@@ -15,20 +15,19 @@ void vli_print(char *str, uint8_t *vli, unsigned int size) {
 
 void BtcRaw(const BtcPrivateKey *privateKey, BtcAddressRaw *addressRaw, int compress)
 {
-    uint32_t buf[26];
+    uint32_t buf[27];
 
     BtcUncompressedPublicKey pubKey;
     uECC_compute_public_key(privateKey, &(pubKey.key));
     pubKey.version = compress ? (pubKey.key.y[SECP256K1_KEY_SIZE - 1] % 2 == 0 ? 0x02 : 0x03) : 0x04;
 
-
     vli_print("Public Key: ", &pubKey, compress ? BTC_PUBLIC_KEY_SIZE : BTC_UNCOMPRESSED_PUBLIC_KEY_SIZE);
 
     Sha256Hash hash;
 
-    sha256_init(&buf);
-    sha256_hash(&buf, &pubKey, compress ? BTC_PUBLIC_KEY_SIZE : BTC_UNCOMPRESSED_PUBLIC_KEY_SIZE);
-    sha256_done(&buf, &hash);
+    tc_sha256_init(&buf);
+    tc_sha256_update(&buf, &pubKey, compress ? BTC_PUBLIC_KEY_SIZE : BTC_UNCOMPRESSED_PUBLIC_KEY_SIZE);
+    tc_sha256_final(&hash, &buf);
 
 
     vli_print("Sha256: ", &hash, SHA256_HASH_SIZE);
