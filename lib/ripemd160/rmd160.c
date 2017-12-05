@@ -88,19 +88,6 @@
 	(c) = ROL((c), 10);\
 	}
 
-/*
-   initializes MDbuffer to "magic constants"
- */
-static void
-RMDinit (u_int32_t * MDbuf)
-{
-  MDbuf[0] = 0x67452301UL;
-  MDbuf[1] = 0xefcdab89UL;
-  MDbuf[2] = 0x98badcfeUL;
-  MDbuf[3] = 0x10325476UL;
-  MDbuf[4] = 0xc3d2e1f0UL;
-}
-
 
 /*
    the compression function.
@@ -304,83 +291,44 @@ RMDcompress (u_int32_t * MDbuf, u_int32_t * X)
   MDbuf[0] = ddd;
 }
 
-
-/*
-   puts bytes from strptr into X and pad out; appends length
-   and finally, compresses the last block(s)
-   note: length in bits == 8 * (lswlen + 2^32 mswlen).
-   note: there are (lswlen mod 64) bytes left in strptr.
- */
-static void
-RMDFinish (u_int32_t * MDbuf, u_int8_t * strptr, u_int32_t lswlen,
-           u_int32_t mswlen)
+void RMD160(unsigned char digest[RMD160_HASHBYTES], const u_int8_t *buf, size_t len, RMD160_CTX *ctx)
 {
-  u_int32_t i;			/* counter */
-  u_int32_t X[16];		/* message words */
+    /* Set the h-vars to their initial values */
+    ctx->iv[0] = 0x67452301UL;
+    ctx->iv[1] = 0xefcdab89UL;
+    ctx->iv[2] = 0x98badcfeUL;
+    ctx->iv[3] = 0x10325476UL;
+    ctx->iv[4] = 0xc3d2e1f0UL;
 
-  memset (X, 0, 16 * sizeof (u_int32_t));
+    memcpy((u_int8_t *)ctx->key, buf, len);
 
-/* put bytes from strptr into X */
-  for (i = 0; i < (lswlen & 63); i++)
+    int i;
+    u_int32_t t;
+    u_int8_t *strptr = (u_int8_t *)ctx->key;
+    u_int32_t X[16];
+
+    memset(X, 0, 16 * sizeof(u_int32_t));
+        
+    /* put bytes from strptr into X */
+    for (i = 0; i < len; i++)
     {
-      /* byte i goes into word X[i div 4] at pos. 8*(i mod 4) */
-      X[i >> 2] ^= (u_int32_t) * strptr++ << (8 * (i & 3));
+        /* byte i goes into word X[i div 4] at pos. 8*(i mod 4) */
+        X[i >> 2] ^= (u_int32_t)* strptr++ << (8 * (i & 3));
     }
 
-  /* append the bit m_n == 1 */
-  X[(lswlen >> 2) & 15] ^= (u_int32_t) 1 << (8 * (lswlen & 3) + 7);
+    X[8]  = 0x80;
+    X[14] = 0x100;
+    RMDcompress(ctx->iv, X);
+    
 
+    u_int8_t *ptr = digest + RMD160_HASHBYTES - 1;
 
-  /* append length in bits */
-  X[14] = lswlen << 3;
-  X[15] = (lswlen >> 29) | (mswlen << 3);
-  RMDcompress (MDbuf, X);
-}
-
-/*
-   Initialize the RIPEMD-160 values
- */
-void
-RMD160Init (RMD160_CTX * ctx)
-{
-  /* Set the h-vars to their initial values */
-  RMDinit (ctx->iv);
-
-  /* Initialise bit count */
-  ctx->bytesHi = 0;
-  ctx->bytesLo = 0;
-}
-
-/*
-   Update the RIPEMD-160 hash state for a block of data.
- */
-void
-RMD160Update (RMD160_CTX * ctx, u_int8_t const *buf, size_t len)
-{
-    ctx->bytesLo = len;
-    memcpy ((u_int8_t *) ctx->key, buf, len);
-}
-
-
-/* 
-   Final wrapup - MD4 style padding on last block.
- */
-void
-RMD160Final (unsigned char digest[20], RMD160_CTX * ctx)
-{
-  int i;
-  u_int32_t t;
-
-  RMDFinish (ctx->iv, (u_int8_t *) ctx->key, ctx->bytesLo, ctx->bytesHi);
-
-  u_int8_t *ptr = digest + RMD160_HASHBYTES - 1;
-
-  for (i = 0; i < RIPEMD160_HASHWORDS; i++)
+    for (i = 0; i < RIPEMD160_HASHWORDS; i++)
     {
-      t = ctx->iv[i];
-      *ptr-- = (u_int8_t) t;
-      *ptr-- = (u_int8_t) (t >> 8);
-      *ptr-- = (u_int8_t) (t >> 16);
-      *ptr-- = (u_int8_t) (t >> 24);
+        t = ctx->iv[i];
+        *ptr-- = (u_int8_t)t;
+        *ptr-- = (u_int8_t)(t >> 8);
+        *ptr-- = (u_int8_t)(t >> 16);
+        *ptr-- = (u_int8_t)(t >> 24);
     }
 }

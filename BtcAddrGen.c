@@ -50,11 +50,7 @@ void BtcRaw(const BtcPrivateKey *privateKey, BtcAddressRaw *addressRaw)
         hash1.hash[SHA256_HASH_SIZE - i - 1] = hash.hash[i];
     }
 
-
-
-    RMD160Init(&buf);
-    RMD160Update(&buf, &hash1, SHA256_HASH_SIZE);
-    RMD160Final(&(addressRaw->hash), &buf);
+    RMD160(&(addressRaw->hash), &hash1, SHA256_HASH_SIZE, &buf);
 
     addressRaw->network = 0x00;
 }

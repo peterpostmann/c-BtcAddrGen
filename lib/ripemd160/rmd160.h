@@ -30,12 +30,7 @@ typedef struct RMD160Context {
 #include <sys/cdefs.h>
 
 __BEGIN_DECLS
-void   RMD160Init(RMD160_CTX *);
-void   RMD160Update(RMD160_CTX *, const u_int8_t *, size_t);
-void   RMD160Final(unsigned char [RMD160_HASHBYTES], RMD160_CTX *);
-char * RMD160End(RMD160_CTX *, char *);
-char * RMD160File(const char *, char *);
-char * RMD160Data(const unsigned char *, unsigned int, char *);
+void RMD160(unsigned char[RMD160_HASHBYTES], const u_int8_t *, size_t, RMD160_CTX *);
 __END_DECLS
 
 #endif /* _RMD160_H_ */

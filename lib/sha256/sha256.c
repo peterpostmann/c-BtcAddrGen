@@ -77,11 +77,6 @@ static void compress(unsigned int *iv, const uint8_t *data);
 
 int tc_sha256_init(TCSha256State_t s)
 {
-	/* input sanity check: */
-	if (s == (TCSha256State_t) 0) {
-		return TC_CRYPTO_FAIL;
-	}
-
 	/*
 	 * Setting the initial state values.
 	 * These values correspond to the first 32 bits of the fractional parts
@@ -97,27 +92,15 @@ int tc_sha256_init(TCSha256State_t s)
 	s->iv[5] = 0x9b05688c;
 	s->iv[6] = 0x1f83d9ab;
 	s->iv[7] = 0x5be0cd19;
-
-	return TC_CRYPTO_SUCCESS;
 }
 
 int tc_sha256_update(TCSha256State_t s, const uint8_t *data, size_t datalen)
 {
-	/* input sanity check: */
-	if (s == (TCSha256State_t) 0 ||
-	    data == (void *) 0) {
-		return TC_CRYPTO_FAIL;
-	} else if (datalen == 0) {
-		return TC_CRYPTO_SUCCESS;
-	}
-
     const uint8_t *ptr = data + datalen - 1;
 
 	while (datalen-- > 0) {
 		s->leftover[s->leftover_offset++] = *(ptr--);
 	}
-
-	return TC_CRYPTO_SUCCESS;
 }
 
 int tc_sha256_final(uint8_t *digest, TCSha256State_t s)
@@ -133,13 +116,6 @@ int tc_sha256_final(uint8_t *digest, TCSha256State_t s)
 	s->bits_hashed += (s->leftover_offset << 3);
 
 	s->leftover[s->leftover_offset++] = 0x80; /* always room for one byte */
-	if (s->leftover_offset > (sizeof(s->leftover) - 8)) {
-		/* there is not room for all the padding in this block */
-		_set(s->leftover + s->leftover_offset, 0x00,
-		     sizeof(s->leftover) - s->leftover_offset);
-		compress(s->iv, s->leftover);
-		s->leftover_offset = 0;
-	}
 
 	/* add the padding and the length in big-Endian format */
 	_set(s->leftover + s->leftover_offset, 0x00,
@@ -167,8 +143,6 @@ int tc_sha256_final(uint8_t *digest, TCSha256State_t s)
 		*ptr-- = (uint8_t)(t >> 8);
 		*ptr-- = (uint8_t)(t);
 	}
-
-	return TC_CRYPTO_SUCCESS;
 }
 
 /*
