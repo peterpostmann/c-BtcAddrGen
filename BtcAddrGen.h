@@ -62,8 +62,8 @@ typedef struct BtcPublicKey {
 } BtcPublicKey;
 
 typedef struct BtcAddressRaw {
-    unsigned char network;
     Ripemd160Hash hash;
+    unsigned char network;
 } BtcAddressRaw;
 
 void BtcRaw(const BtcPrivateKey *privateKey, BtcAddressRaw *addressRaw);

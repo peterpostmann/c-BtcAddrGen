@@ -17,7 +17,7 @@ int main()
 
     BtcAddressRaw addressRaw;
     BtcRaw(&privateKey, &addressRaw);
-    vli_print_bigEnd("Address:", &addressRaw, BTC_ADDRESS_RAW_SIZE);
+    vli_print("Address:", &addressRaw, BTC_ADDRESS_RAW_SIZE);
        printf("         00 F5 4A 58 51 E9 37 2B 87 81 0A 8E 60 CD D2 E7 CF D8 0B 6E 31\n");
 
     return 0;

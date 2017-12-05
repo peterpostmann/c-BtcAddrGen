@@ -330,35 +330,12 @@ RMDFinish (u_int32_t * MDbuf, u_int8_t * strptr, u_int32_t lswlen,
   /* append the bit m_n == 1 */
   X[(lswlen >> 2) & 15] ^= (u_int32_t) 1 << (8 * (lswlen & 3) + 7);
 
-  if ((lswlen & 63) > 55)
-    {
-      /* length goes to next block */
-      RMDcompress (MDbuf, X);
-      memset (X, 0, 16 * sizeof (u_int32_t));
-    }
 
   /* append length in bits */
   X[14] = lswlen << 3;
   X[15] = (lswlen >> 29) | (mswlen << 3);
   RMDcompress (MDbuf, X);
 }
-
-/*
-   Shuffle the bytes into little-endian order within words, as per the
-   RIPEMD-160 spec (which follows MD4 conventions).
- */
-static void
-rmd160ByteSwap (u_int32_t * dest, u_int8_t const *src, unsigned int words)
-{
-  do
-    {
-      *dest++ = (u_int32_t) ((unsigned) src[3] << 8 | src[2]) << 16 |
-	((unsigned) src[1] << 8 | src[0]);
-      src += 4;
-    }
-  while (--words);
-}
-
 
 /*
    Initialize the RIPEMD-160 values
@@ -380,43 +357,8 @@ RMD160Init (RMD160_CTX * ctx)
 void
 RMD160Update (RMD160_CTX * ctx, u_int8_t const *buf, size_t len)
 {
-  unsigned i;
-
-  /* Update bitcount */
-  u_int32_t t = ctx->bytesLo;
-  if ((ctx->bytesLo = t + len) < t)
-    ctx->bytesHi++;		/* Carry from low to high */
-
-  i = (unsigned) t % RIPEMD160_BLOCKBYTES;	/* Bytes already in ctx->key */
-
-  /* i is always less than RIPEMD160_BLOCKBYTES. */
-  if (RIPEMD160_BLOCKBYTES - i > len)
-    {
-      memcpy ((u_int8_t *) ctx->key + i, buf, len);
-      return;
-    }
-
-  if (i)
-    {				/* First chunk is an odd size */
-      memcpy ((u_int8_t *) ctx->key + i, buf, RIPEMD160_BLOCKBYTES - i);
-      rmd160ByteSwap (ctx->key, (u_int8_t *) ctx->key, RIPEMD160_BLOCKWORDS);
-      RMDcompress (ctx->iv, ctx->key);
-      buf += RIPEMD160_BLOCKBYTES - i;
-      len -= RIPEMD160_BLOCKBYTES - i;
-    }
-
-  /* Process data in 64-byte chunks */
-  while (len >= RIPEMD160_BLOCKBYTES)
-    {
-      rmd160ByteSwap (ctx->key, buf, RIPEMD160_BLOCKWORDS);
-      RMDcompress (ctx->iv, ctx->key);
-      buf += RIPEMD160_BLOCKBYTES;
-      len -= RIPEMD160_BLOCKBYTES;
-    }
-
-  /* Handle any remaining bytes of data. */
-  if (len)
-    memcpy (ctx->key, buf, len);
+    ctx->bytesLo = len;
+    memcpy ((u_int8_t *) ctx->key, buf, len);
 }
 
 
@@ -431,14 +373,14 @@ RMD160Final (unsigned char digest[20], RMD160_CTX * ctx)
 
   RMDFinish (ctx->iv, (u_int8_t *) ctx->key, ctx->bytesLo, ctx->bytesHi);
 
+  u_int8_t *ptr = digest + RMD160_HASHBYTES - 1;
+
   for (i = 0; i < RIPEMD160_HASHWORDS; i++)
     {
       t = ctx->iv[i];
-      digest[i * 4 + 0] = (u_int8_t) t;
-      digest[i * 4 + 1] = (u_int8_t) (t >> 8);
-      digest[i * 4 + 2] = (u_int8_t) (t >> 16);
-      digest[i * 4 + 3] = (u_int8_t) (t >> 24);
+      *ptr-- = (u_int8_t) t;
+      *ptr-- = (u_int8_t) (t >> 8);
+      *ptr-- = (u_int8_t) (t >> 16);
+      *ptr-- = (u_int8_t) (t >> 24);
     }
-
-  memset (ctx, 0, sizeof (ctx));	/* In case it's sensitive */
 }
