@@ -50,15 +50,15 @@ void Ripemd160(const uint8_t *data, uint32_t len, Ripemd160Hash *hash);
 #define BTC_ADDRESS_RAW_SIZE             (   RIPEMD160_HASH_SIZE  + 1)
 
 typedef struct BtcUncompressedPublicKey {
-    unsigned char version;
     Secp256k1UncompressedPublicKey key;
+    unsigned char version;
 } BtcUncompressedPublicKey;
 
 typedef Secp256k1Key BtcPrivateKey;
 
 typedef struct BtcPublicKey {
-    unsigned char version;
     Secp256k1Key key;
+    unsigned char version;
 } BtcPublicKey;
 
 typedef struct BtcAddressRaw {

@@ -673,7 +673,7 @@ static void vli_nativeToBytes(uint8_t *bytes, const uint64_t *native) {
 void vli_print_native(char *str, uint8_t *vli, unsigned int size);
 
 int uECC_compute_public_key(const uint8_t private_key[uECC_BYTES],
-                            uint8_t public_key[uECC_BYTES * 2]) {
+    uint8_t public_key[uECC_BYTES * 2]) {
     uECC_word_t private[uECC_WORDS];
     EccPoint public;
 
@@ -682,7 +682,7 @@ int uECC_compute_public_key(const uint8_t private_key[uECC_BYTES],
     uECC_word_t * RESTRICT scalar = private_key;
     uECC_word_t * RESTRICT initialZ = 0;
     bitcount_t numBits = vli_numBits(private_key, uECC_WORDS);
-    
+
     uECC_word_t Rx[2][uECC_WORDS];
     uECC_word_t Ry[2][uECC_WORDS];
     uECC_word_t z[uECC_WORDS];
@@ -715,12 +715,6 @@ int uECC_compute_public_key(const uint8_t private_key[uECC_BYTES],
     XYcZ_add(Rx[nb], Ry[nb], Rx[1 - nb], Ry[1 - nb]);
     apply_z(Rx[0], Ry[0], z);
 
-    vli_set(result->x, Rx[0]);
-    vli_set(result->y, Ry[0]);
-
-    vli_print_native("2: ", &public, 2*uECC_BYTES);
-
-    vli_nativeToBytes(public_key, public.x);
-    vli_nativeToBytes(public_key + uECC_BYTES, public.y);
-    return 1;
+    vli_set(public_key, Rx[0]);
+    *(public_key + uECC_BYTES) = Ry[0][uECC_WORDS - 1] % 2 ? 0x02 : 0x03;
 }

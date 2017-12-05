@@ -111,13 +111,10 @@ int tc_sha256_update(TCSha256State_t s, const uint8_t *data, size_t datalen)
 		return TC_CRYPTO_SUCCESS;
 	}
 
+    const uint8_t *ptr = data + datalen - 1;
+
 	while (datalen-- > 0) {
-		s->leftover[s->leftover_offset++] = *(data++);
-		if (s->leftover_offset >= TC_SHA256_BLOCK_SIZE) {
-			compress(s->iv, s->leftover);
-			s->leftover_offset = 0;
-			s->bits_hashed += (TC_SHA256_BLOCK_SIZE << 3);
-		}
+		s->leftover[s->leftover_offset++] = *(ptr--);
 	}
 
 	return TC_CRYPTO_SUCCESS;
@@ -147,6 +144,7 @@ int tc_sha256_final(uint8_t *digest, TCSha256State_t s)
 	/* add the padding and the length in big-Endian format */
 	_set(s->leftover + s->leftover_offset, 0x00,
 	     sizeof(s->leftover) - 8 - s->leftover_offset);
+
 	s->leftover[sizeof(s->leftover) - 1] = (uint8_t)(s->bits_hashed);
 	s->leftover[sizeof(s->leftover) - 2] = (uint8_t)(s->bits_hashed >> 8);
 	s->leftover[sizeof(s->leftover) - 3] = (uint8_t)(s->bits_hashed >> 16);
@@ -159,17 +157,16 @@ int tc_sha256_final(uint8_t *digest, TCSha256State_t s)
 	/* hash the padding and length */
 	compress(s->iv, s->leftover);
 
+    uint8_t *ptr = digest + TC_SHA256_DIGEST_SIZE - 1;
+
 	/* copy the iv out to digest */
 	for (i = 0; i < TC_SHA256_STATE_BLOCKS; ++i) {
 		unsigned int t = *((unsigned int *) &s->iv[i]);
-		*digest++ = (uint8_t)(t >> 24);
-		*digest++ = (uint8_t)(t >> 16);
-		*digest++ = (uint8_t)(t >> 8);
-		*digest++ = (uint8_t)(t);
+		*ptr-- = (uint8_t)(t >> 24);
+		*ptr-- = (uint8_t)(t >> 16);
+		*ptr-- = (uint8_t)(t >> 8);
+		*ptr-- = (uint8_t)(t);
 	}
-
-	/* destroy the current state */
-	_set(s, 0, sizeof(*s));
 
 	return TC_CRYPTO_SUCCESS;
 }
