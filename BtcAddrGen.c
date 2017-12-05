@@ -42,15 +42,7 @@ void BtcRaw(const BtcPrivateKey *privateKey, BtcAddressRaw *addressRaw)
     vli_print("Sha256:", &hash, SHA256_HASH_SIZE);
                printf("        0B 7C 28 C9 B7 29 0C 98 D7 43 8E 70 B3 D3 F7 C8 48 FB D7 D1 DC 19 4F F8 3F 4F 7C C9 B1 37 8E 98\n");
 
-
-    Sha256Hash hash1;
-
-    for (int i = 0; i < SHA256_HASH_SIZE; i++)
-    {
-        hash1.hash[SHA256_HASH_SIZE - i - 1] = hash.hash[i];
-    }
-
-    RMD160(&(addressRaw->hash), &hash1, SHA256_HASH_SIZE, &buf);
+    RMD160(&(addressRaw->hash), &hash, SHA256_HASH_SIZE, &buf);
 
     addressRaw->network = 0x00;
 }

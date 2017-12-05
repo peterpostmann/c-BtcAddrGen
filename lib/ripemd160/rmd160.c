@@ -291,6 +291,9 @@ RMDcompress (u_int32_t * MDbuf, u_int32_t * X)
   MDbuf[0] = ddd;
 }
 
+
+void vli_print(char *str, u_int8_t *vli, unsigned int size);
+
 void RMD160(unsigned char digest[RMD160_HASHBYTES], const u_int8_t *buf, size_t len, RMD160_CTX *ctx)
 {
     /* Set the h-vars to their initial values */
@@ -299,12 +302,8 @@ void RMD160(unsigned char digest[RMD160_HASHBYTES], const u_int8_t *buf, size_t 
     ctx->iv[2] = 0x98badcfeUL;
     ctx->iv[3] = 0x10325476UL;
     ctx->iv[4] = 0xc3d2e1f0UL;
-
-    memcpy((u_int8_t *)ctx->key, buf, len);
-
+    
     int i;
-    u_int32_t t;
-    u_int8_t *strptr = (u_int8_t *)ctx->key;
     u_int32_t X[16];
 
     memset(X, 0, 16 * sizeof(u_int32_t));
@@ -312,23 +311,16 @@ void RMD160(unsigned char digest[RMD160_HASHBYTES], const u_int8_t *buf, size_t 
     /* put bytes from strptr into X */
     for (i = 0; i < len; i++)
     {
-        /* byte i goes into word X[i div 4] at pos. 8*(i mod 4) */
-        X[i >> 2] ^= (u_int32_t)* strptr++ << (8 * (i & 3));
+        ((u_int8_t *)X)[i] = buf[len - i - 1];
     }
 
     X[8]  = 0x80;
     X[14] = 0x100;
+
     RMDcompress(ctx->iv, X);
-    
 
-    u_int8_t *ptr = digest + RMD160_HASHBYTES - 1;
-
-    for (i = 0; i < RIPEMD160_HASHWORDS; i++)
+    for (i = 0; i < RIPEMD160_HASHBYTES; i++)
     {
-        t = ctx->iv[i];
-        *ptr-- = (u_int8_t)t;
-        *ptr-- = (u_int8_t)(t >> 8);
-        *ptr-- = (u_int8_t)(t >> 16);
-        *ptr-- = (u_int8_t)(t >> 24);
+        digest[RIPEMD160_HASHBYTES - i - 1] = ((u_int8_t *)ctx->iv)[i];
     }
 }
