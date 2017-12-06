@@ -145,6 +145,13 @@ int tc_sha256_final(uint8_t *digest, TCSha256State_t s)
 	}
 }
 
+void SHA256(uint8_t *digest, const uint8_t *data, size_t datalen, TCSha256State_t s)
+{
+    tc_sha256_init(s);
+    tc_sha256_update(s, data, datalen);
+    tc_sha256_final(digest, s);
+}
+
 /*
  * Initializing SHA-256 Hash constant words K.
  * These values correspond to the first 32 bits of the fractional parts of the

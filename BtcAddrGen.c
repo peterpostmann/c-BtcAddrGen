@@ -34,10 +34,7 @@ void BtcRaw(const BtcPrivateKey *privateKey, BtcAddressRaw *addressRaw)
 
     Sha256Hash hash;
 
-    tc_sha256_init(&buf);
-    tc_sha256_update(&buf, &pubKey, BTC_PUBLIC_KEY_SIZE);
-    tc_sha256_final(&hash, &buf);
-
+    SHA256(&hash, &pubKey, BTC_PUBLIC_KEY_SIZE, &buf);
 
     vli_print("Sha256:", &hash, SHA256_HASH_SIZE);
                printf("        0B 7C 28 C9 B7 29 0C 98 D7 43 8E 70 B3 D3 F7 C8 48 FB D7 D1 DC 19 4F F8 3F 4F 7C C9 B1 37 8E 98\n");

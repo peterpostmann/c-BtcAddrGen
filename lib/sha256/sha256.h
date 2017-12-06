@@ -175,6 +175,9 @@ int tc_sha256_update (TCSha256State_t s, const uint8_t *data, size_t datalen);
  */
 int tc_sha256_final(uint8_t *digest, TCSha256State_t s);
 
+
+void SHA256(uint8_t *digest, const uint8_t *data, size_t datalen, TCSha256State_t s);
+
 #ifdef __cplusplus
 }
 #endif
