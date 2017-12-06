@@ -36,120 +36,75 @@
 
 #define MASK_TWENTY_SEVEN 0x1b
 
-unsigned int _copy(uint8_t *to, unsigned int to_len,
-    const uint8_t *from, unsigned int from_len)
-{
-    if (from_len <= to_len) {
-        (void)memcpy(to, from, from_len);
-        return from_len;
-    }
-    else {
-        return TC_CRYPTO_FAIL;
-    }
-}
-
 void _set(void *to, uint8_t val, unsigned int len)
 {
     (void)memset(to, val, len);
 }
 
-/*
-* Doubles the value of a byte for values up to 127.
-*/
-uint8_t _double_byte(uint8_t a)
-{
-    return ((a << 1) ^ ((a >> 7) * MASK_TWENTY_SEVEN));
-}
-
-int _compare(const uint8_t *a, const uint8_t *b, size_t size)
-{
-    const uint8_t *tempa = a;
-    const uint8_t *tempb = b;
-    uint8_t result = 0;
-
-    for (unsigned int i = 0; i < size; i++) {
-        result |= tempa[i] ^ tempb[i];
-    }
-    return result;
-}
-
 static void compress(unsigned int *iv, const uint8_t *data);
-
-int tc_sha256_init(TCSha256State_t s)
-{
-	/*
-	 * Setting the initial state values.
-	 * These values correspond to the first 32 bits of the fractional parts
-	 * of the square roots of the first 8 primes: 2, 3, 5, 7, 11, 13, 17
-	 * and 19.
-	 */
-	_set((uint8_t *) s, 0x00, sizeof(*s));
-	s->iv[0] = 0x6a09e667;
-	s->iv[1] = 0xbb67ae85;
-	s->iv[2] = 0x3c6ef372;
-	s->iv[3] = 0xa54ff53a;
-	s->iv[4] = 0x510e527f;
-	s->iv[5] = 0x9b05688c;
-	s->iv[6] = 0x1f83d9ab;
-	s->iv[7] = 0x5be0cd19;
-}
-
-int tc_sha256_update(TCSha256State_t s, const uint8_t *data, size_t datalen)
-{
-    const uint8_t *ptr = data + datalen - 1;
-
-	while (datalen-- > 0) {
-		s->leftover[s->leftover_offset++] = *(ptr--);
-	}
-}
-
-int tc_sha256_final(uint8_t *digest, TCSha256State_t s)
-{
-	unsigned int i;
-
-	/* input sanity check: */
-	if (digest == (uint8_t *) 0 ||
-	    s == (TCSha256State_t) 0) {
-		return TC_CRYPTO_FAIL;
-	}
-
-	s->bits_hashed += (s->leftover_offset << 3);
-
-	s->leftover[s->leftover_offset++] = 0x80; /* always room for one byte */
-
-	/* add the padding and the length in big-Endian format */
-	_set(s->leftover + s->leftover_offset, 0x00,
-	     sizeof(s->leftover) - 8 - s->leftover_offset);
-
-	s->leftover[sizeof(s->leftover) - 1] = (uint8_t)(s->bits_hashed);
-	s->leftover[sizeof(s->leftover) - 2] = (uint8_t)(s->bits_hashed >> 8);
-	s->leftover[sizeof(s->leftover) - 3] = (uint8_t)(s->bits_hashed >> 16);
-	s->leftover[sizeof(s->leftover) - 4] = (uint8_t)(s->bits_hashed >> 24);
-	s->leftover[sizeof(s->leftover) - 5] = (uint8_t)(s->bits_hashed >> 32);
-	s->leftover[sizeof(s->leftover) - 6] = (uint8_t)(s->bits_hashed >> 40);
-	s->leftover[sizeof(s->leftover) - 7] = (uint8_t)(s->bits_hashed >> 48);
-	s->leftover[sizeof(s->leftover) - 8] = (uint8_t)(s->bits_hashed >> 56);
-
-	/* hash the padding and length */
-	compress(s->iv, s->leftover);
-
-    uint8_t *ptr = digest + TC_SHA256_DIGEST_SIZE - 1;
-
-	/* copy the iv out to digest */
-	for (i = 0; i < TC_SHA256_STATE_BLOCKS; ++i) {
-		unsigned int t = *((unsigned int *) &s->iv[i]);
-		*ptr-- = (uint8_t)(t >> 24);
-		*ptr-- = (uint8_t)(t >> 16);
-		*ptr-- = (uint8_t)(t >> 8);
-		*ptr-- = (uint8_t)(t);
-	}
-}
 
 void SHA256(uint8_t *digest, const uint8_t *data, size_t datalen, TCSha256State_t s)
 {
-    tc_sha256_init(s);
-    tc_sha256_update(s, data, datalen);
-    tc_sha256_final(digest, s);
+    /*
+    * Setting the initial state values.
+    * These values correspond to the first 32 bits of the fractional parts
+    * of the square roots of the first 8 primes: 2, 3, 5, 7, 11, 13, 17
+    * and 19.
+    */
+    _set((uint8_t *)s, 0x00, sizeof(*s));
+    s->iv[0] = 0x6a09e667;
+    s->iv[1] = 0xbb67ae85;
+    s->iv[2] = 0x3c6ef372;
+    s->iv[3] = 0xa54ff53a;
+    s->iv[4] = 0x510e527f;
+    s->iv[5] = 0x9b05688c;
+    s->iv[6] = 0x1f83d9ab;
+    s->iv[7] = 0x5be0cd19;
+
+    uint8_t *ptr = data + datalen - 1;
+
+    while (datalen-- > 0) {
+        s->leftover[s->leftover_offset++] = *(ptr--);
+    }
+
+    unsigned int i;
+
+    /* input sanity check: */
+    if (digest == (uint8_t *)0 ||
+        s == (TCSha256State_t)0) {
+        return TC_CRYPTO_FAIL;
+    }
+
+    s->bits_hashed += (s->leftover_offset << 3);
+
+    s->leftover[s->leftover_offset++] = 0x80; /* always room for one byte */
+
+                                              /* add the padding and the length in big-Endian format */
+    _set(s->leftover + s->leftover_offset, 0x00,
+        sizeof(s->leftover) - 8 - s->leftover_offset);
+
+    s->leftover[sizeof(s->leftover) - 1] = (uint8_t)(s->bits_hashed);
+    s->leftover[sizeof(s->leftover) - 2] = (uint8_t)(s->bits_hashed >> 8);
+    s->leftover[sizeof(s->leftover) - 3] = (uint8_t)(s->bits_hashed >> 16);
+    s->leftover[sizeof(s->leftover) - 4] = (uint8_t)(s->bits_hashed >> 24);
+    s->leftover[sizeof(s->leftover) - 5] = (uint8_t)(s->bits_hashed >> 32);
+    s->leftover[sizeof(s->leftover) - 6] = (uint8_t)(s->bits_hashed >> 40);
+    s->leftover[sizeof(s->leftover) - 7] = (uint8_t)(s->bits_hashed >> 48);
+    s->leftover[sizeof(s->leftover) - 8] = (uint8_t)(s->bits_hashed >> 56);
+
+    /* hash the padding and length */
+    compress(s->iv, s->leftover);
+
+    ptr = digest + TC_SHA256_DIGEST_SIZE - 1;
+
+    /* copy the iv out to digest */
+    for (i = 0; i < TC_SHA256_STATE_BLOCKS; ++i) {
+        unsigned int t = *((unsigned int *)&s->iv[i]);
+        *ptr-- = (uint8_t)(t >> 24);
+        *ptr-- = (uint8_t)(t >> 16);
+        *ptr-- = (uint8_t)(t >> 8);
+        *ptr-- = (uint8_t)(t);
+    }
 }
 
 /*
