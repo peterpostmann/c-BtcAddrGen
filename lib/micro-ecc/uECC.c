@@ -615,63 +615,6 @@ static void XYcZ_addC(uECC_word_t * RESTRICT X1,
     vli_set(X1, t7);
 }
 
-static void EccPoint_mult(EccPoint * RESTRICT result,
-                          const EccPoint * RESTRICT point,
-                          const uECC_word_t * RESTRICT scalar,
-                          const uECC_word_t * RESTRICT initialZ,
-                          bitcount_t numBits) {
-    /* R0 and R1 */
-    uECC_word_t Rx[2][uECC_WORDS];
-    uECC_word_t Ry[2][uECC_WORDS];
-    uECC_word_t z[uECC_WORDS];
-    bitcount_t i;
-    uECC_word_t nb;
-
-    vli_set(Rx[1], point->x);
-    vli_set(Ry[1], point->y);
-
-    XYcZ_initial_double(Rx[1], Ry[1], Rx[0], Ry[0], initialZ);
-
-    for (i = numBits - 2; i > 0; --i) {
-        nb = !vli_testBit(scalar, i);
-        XYcZ_addC(Rx[1 - nb], Ry[1 - nb], Rx[nb], Ry[nb]);
-        XYcZ_add(Rx[nb], Ry[nb], Rx[1 - nb], Ry[1 - nb]);
-    }
-
-    nb = !vli_testBit(scalar, 0);
-    XYcZ_addC(Rx[1 - nb], Ry[1 - nb], Rx[nb], Ry[nb]);
-
-    vli_modSub_fast(z, Rx[1], Rx[0]);       // X1 - X0
-    vli_modMult_fast(z, z, Ry[1 - nb]);     // Yb * (X1 - X0)
-    vli_modMult_fast(z, z, point->x);       // xP * Yb * (X1 - X0)
-    vli_modInv(z, z, curve_p);              // 1 / (xP * Yb * (X1 - X0))
-    vli_modMult_fast(z, z, point->y);       // yP / (xP * Yb * (X1 - X0))
-    vli_modMult_fast(z, z, Rx[1 - nb]);     // Xb * yP / (xP * Yb * (X1 - X0))
-
-    XYcZ_add(Rx[nb], Ry[nb], Rx[1 - nb], Ry[1 - nb]);
-    apply_z(Rx[0], Ry[0], z);
-
-    vli_set(result->x, Rx[0]);
-    vli_set(result->y, Ry[0]);
-}
-
-static void vli_nativeToBytes(uint8_t *bytes, const uint64_t *native) {
-    unsigned i;
-    for (i = 0; i < uECC_WORDS; ++i) {
-        uint8_t *digit = bytes + 8 * (uECC_WORDS - 1 - i);
-        digit[0] = native[i] >> 56;
-        digit[1] = native[i] >> 48;
-        digit[2] = native[i] >> 40;
-        digit[3] = native[i] >> 32;
-        digit[4] = native[i] >> 24;
-        digit[5] = native[i] >> 16;
-        digit[6] = native[i] >> 8;
-        digit[7] = native[i];
-    }
-}
-
-void vli_print_native(char *str, uint8_t *vli, unsigned int size);
-
 int uECC_compute_public_key(const uint8_t private_key[uECC_BYTES],
     uint8_t public_key[uECC_BYTES * 2]) {
     uECC_word_t private[uECC_WORDS];
