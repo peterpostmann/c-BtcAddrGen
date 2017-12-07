@@ -3,22 +3,62 @@
 
 #include "BtcAddrGen.h"
 
+#define KEY( _00, _01, _02, _03, _04, _05, _06, _07, _08, \ 
+                   _09, _10, _11, _12, _13, _14, _15, _16, \
+                   _17, _18, _19, _20, _21, _22, _23, _24, \
+                   _25, _26, _27, _28, _29, _30, _31, _32) \
+            {                                        \
+                _00 ## _32, _00 ## _31, _00 ## _30, _00 ## _29, _00 ## _28, _00 ## _27, _00 ## _26, _00 ## _25, \
+                _00 ## _24, _00 ## _23, _00 ## _22, _00 ## _21, _00 ## _20, _00 ## _19, _00 ## _18, _00 ## _17, \
+                _00 ## _16, _00 ## _15, _00 ## _14, _00 ## _13, _00 ## _12, _00 ## _11, _00 ## _10, _00 ## _09, \
+                _00 ## _08, _00 ## _07, _00 ## _06, _00 ## _05, _00 ## _04, _00 ## _03, _00 ## _02, _00 ## _01, \
+            }
+
+#define PRIVKEY(_01, _02, _03, _04, _05, _06, _07, _08, \ 
+                _09, _10, _11, _12, _13, _14, _15, _16, \
+                _17, _18, _19, _20, _21, _22, _23, _24, \
+                _25, _26, _27, _28, _29, _30, _31, _32) \
+        KEY(0x, _01, _02, _03, _04, _05, _06, _07, _08, \
+                _09, _10, _11, _12, _13, _14, _15, _16, \
+                _17, _18, _19, _20, _21, _22, _23, _24, \
+                _25, _26, _27, _28, _29, _30, _31, _32) 
+
+
+#define  PUBKEY(_01, _02, _03, _04, _05, _06, _07, _08, \ 
+                _09, _10, _11, _12, _13, _14, _15, _16, \
+                _17, _18, _19, _20)                     \
+        KEY(0x,   0,   0,   0,   0,   0,   0,   0,   0, \
+                  0,   0,   0,   0, _01, _02, _03, _04, \
+                _05, _06, _07, _08, _09, _10, _11, _12, \
+                _13, _14, _15, _16, _17, _18, _19, _20)
+
+uint8_t keys[][2][32] = {
+    {
+        PRIVKEY(18, E1, 4A, 7B, 6A, 30, 7F, 42, 6A, 94, F8, 11, 47, 01, E7, C8, E7, 74, E7, F9, A4, 7E, 2C, 20, 35, DB, 29, A2, 06, 32, 17, 25),
+        PUBKEY(F5, 4A, 58, 51, E9, 37, 2B, 87, 81, 0A, 8E, 60, CD, D2, E7, CF, D8, 0B, 6E, 31) // Version 0x02
+    },
+    {
+        PRIVKEY(BE, 40, 06, D3, CF, 04, BE, 2C, C9, 3E, 8F, 8C, 82, 4C, 7F, 80, 3E, 2F, 80, 4E, 68, FD, 7A, 38, 1C, 09, 5E, B9, 2B, 9B, 6A, 01),
+        PUBKEY(E4, B2, 4A, 5D, 8B, 4A, FC, 57, 88, 15, 6B, 61, 33, 2F, 74, 89, EC, 28, B2, FD) // Version 0x03
+    }
+};
+
+#define NUM_KEYS (sizeof(keys) / sizeof(*keys))
+
 int main()
 {
     printf("hello from BtcAddrGen!\n");
 
-	Secp256k1Key privateKey = { .key = { 0x25, 0x17, 0x32, 0x06, 0xA2, 0x29, 0xDB, 0x35, 
-                                         0x20, 0x2C, 0x7E, 0xA4, 0xF9, 0xE7, 0x74, 0xE7, 
-                                         0xC8, 0xE7, 0x01, 0x47, 0x11, 0xF8, 0x94, 0x6A, 
-                                         0x42, 0x7F, 0x30, 0x6A, 0x7B, 0x4A, 0xE1, 0x18} };
+    for (int i = 0; i < NUM_KEYS; i++)
+    {
+        Secp256k1Key *privateKey = keys[i][0];
+        vli_print("Private Key:", privateKey, SECP256K1_KEY_SIZE);
 
-    vli_print("Private Key", &privateKey, SECP256K1_KEY_SIZE);
-       printf("            18 E1 4A 7B 6A 30 7F 42 6A 94 F8 11 47 01 E7 C8 E7 74 E7 F9 A4 7E 2C 20 35 DB 29 A2 06 32 17 25\n");
-
-    BtcAddressRaw addressRaw;
-    BtcRaw(&privateKey, &addressRaw);
-    vli_print("Address:", &addressRaw, BTC_ADDRESS_RAW_SIZE);
-       printf("         00 F5 4A 58 51 E9 37 2B 87 81 0A 8E 60 CD D2 E7 CF D8 0B 6E 31\n");
+        BtcAddressRaw addressRaw;
+        BtcRaw(privateKey, &addressRaw);
+        vli_print("Address    :", &addressRaw, BTC_ADDRESS_RAW_SIZE);
+        vli_print("Address    :", &keys[i][1][0], BTC_ADDRESS_RAW_SIZE);
+    }
 
     return 0;
 }
